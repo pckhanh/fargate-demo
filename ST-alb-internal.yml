@@ -1,38 +1,61 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: External, public facing load balancer, for forwarding public traffic to containers
 Parameters:
+  VPC:
+    Type: 'AWS::SSM::Parameter::Value<AWS::EC2::VPC::Id>'
+    Default: CustomVPC
+    AllowedValues:
+      - 'CustomVPC'
+    Description: VPC where the EC2 DataStage will be created
+  InstanceSubnet:
+    Type: 'AWS::SSM::Parameter::Value<String>'
+    Default: /network/Apps_2a
+    Description: Subnet and Availability Zone to deploy to
+    AllowedValues:
+      - /network/Apps_2a
+      - /network/Apps_2b
+      - /network/Apps_2c
+      - /network/Data_2a
+      - /network/Data_2b
+      - /network/Data_2c
+      
   EnvironmentName:
     Type: String
     Default: fargatedemo
     Description: The name of the environment to add this load balancer to
 Resources:
+  ContainerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Access to the Fargate containers
+      VpcId: !Ref 'CustomVPC'
+      
   EcsSecurityGroupIngressFromPublicALB:
     Type: AWS::EC2::SecurityGroupIngress
     Properties:
       Description: Ingress from the public ALB
       GroupId:
-        Fn::ImportValue: !Sub ${EnvironmentName}:ContainerSecurityGroup
+        Fn::ImportValue: !Ref 'ContainerSecurityGroup'
       IpProtocol: -1
-      SourceSecurityGroupId: !Ref 'PublicLoadBalancerSG'
+      SourceSecurityGroupId: !Ref 'PrivateLoadBalancerSG'
 
   # Public load balancer, hosted in public subnets that is accessible
   # to the public, and is intended to route traffic to one or more public
   # facing services. This is used for accepting traffic from the public
   # internet and directing it to public facing microservices
-  PublicLoadBalancerSG:
+  PrivateLoadBalancerSG:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: Access to the public facing load balancer
-      VpcId:
-        Fn::ImportValue: !Sub ${EnvironmentName}:VpcId
+      VpcId: !Ref 'CustomVPC'        
       SecurityGroupIngress:
           # Allow access to ALB from anywhere on the internet
-          - CidrIp: 0.0.0.0/0
+          - CidrIp: 10.0.0.0/0
             IpProtocol: -1
   PublicLoadBalancer:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
-      Scheme: internet-facing
+      Scheme: internal
       LoadBalancerAttributes:
       - Key: idle_timeout.timeout_seconds
         Value: '30'
@@ -42,7 +65,7 @@ Resources:
         - Fn::ImportValue: !Sub ${EnvironmentName}:PublicSubnetOne
         - Fn::ImportValue: !Sub ${EnvironmentName}:PublicSubnetTwo
         - Fn::ImportValue: !Sub ${EnvironmentName}:PublicSubnetThree
-      SecurityGroups: [!Ref 'PublicLoadBalancerSG']
+      SecurityGroups: [!Ref 'PrivateLoadBalancerSG']
   # A dummy target group is used to setup the ALB to just drop traffic
   # initially, before any real service target groups have been added.
   DummyTargetGroupPublic:
