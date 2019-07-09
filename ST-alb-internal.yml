@@ -6,31 +6,18 @@ Parameters:
     Default: CustomVPC
     AllowedValues:
       - 'CustomVPC'
-    Description: VPC where the EC2 DataStage will be created
+    Description: Default do not change
     
-  # InstanceSubnet:
-    # Type: 'AWS::SSM::Parameter::Value<String>'
-    # Default: /network/Apps_2a
-    # Description: Subnet and Availability Zone to deploy to
-    # AllowedValues:
-      # - /network/Apps_2a
-      # - /network/Apps_2b
-      # - /network/Apps_2c
-      # - /network/Data_2a
-      # - /network/Data_2b
-      # - /network/Data_2c
+  APPSubnets: 
+    Type: 'AWS::SSM::Parameter::Value<List<AWS::EC2::Subnet::Id>>'
+    Default: SharedAppSubnets
+    Description: Default do not change
  
-  agency:
-    Type: String
-    Default: ST
-    Description: The name of the environment to add this load balancer to
   EnvironmentName:
-
     Type: String
-
     Default: fargatedemo
-
     Description: The name of the environment to add this load balancer to
+    
 Resources:
   ContainerSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -66,12 +53,7 @@ Resources:
       LoadBalancerAttributes:
       - Key: idle_timeout.timeout_seconds
         Value: '30'
-      Subnets:
-        # The load balancer is placed into the public subnets, so that traffic
-        # from the internet can reach the load balancer directly via the internet gateway
-        - Fn::ImportValue: !Sub ${agency}:SubnetAPrivate1
-        - Fn::ImportValue: !Sub ${agency}:SubnetAPrivate2
-        - Fn::ImportValue: !Sub ${agency}:SubnetAPrivate3
+      Subnets: !Ref 'APPSubnets'
       SecurityGroups: [!Ref 'PrivateLoadBalancerSG']
   # A dummy target group is used to setup the ALB to just drop traffic
   # initially, before any real service target groups have been added.
