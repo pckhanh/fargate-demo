@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: External, public facing load balancer, for forwarding public traffic to containers
+Description: ST Private LoadBalancer
 Parameters:
   VPC:
     Type: 'AWS::SSM::Parameter::Value<AWS::EC2::VPC::Id>'
@@ -19,9 +19,9 @@ Parameters:
       - /network/Data_2b
       - /network/Data_2c
       
-  EnvironmentName:
+  agency:
     Type: String
-    Default: fargatedemo
+    Default: ST
     Description: The name of the environment to add this load balancer to
 Resources:
   ContainerSecurityGroup:
@@ -52,7 +52,7 @@ Resources:
           # Allow access to ALB from anywhere on the internet
           - CidrIp: 10.0.0.0/0
             IpProtocol: -1
-  PublicLoadBalancer:
+  PrivateoadBalancer:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
       Scheme: internal
@@ -62,9 +62,9 @@ Resources:
       Subnets:
         # The load balancer is placed into the public subnets, so that traffic
         # from the internet can reach the load balancer directly via the internet gateway
-        - Fn::ImportValue: !Sub ${EnvironmentName}:PublicSubnetOne
-        - Fn::ImportValue: !Sub ${EnvironmentName}:PublicSubnetTwo
-        - Fn::ImportValue: !Sub ${EnvironmentName}:PublicSubnetThree
+        - Fn::ImportValue: !Sub ${agency}:SubnetAPrivate1
+        - Fn::ImportValue: !Sub ${agency}:SubnetAPrivate2
+        - Fn::ImportValue: !Sub ${agency}:SubnetAPrivate3
       SecurityGroups: [!Ref 'PrivateLoadBalancerSG']
   # A dummy target group is used to setup the ALB to just drop traffic
   # initially, before any real service target groups have been added.
@@ -82,33 +82,32 @@ Resources:
       Port: 80
       Protocol: HTTP
       UnhealthyThresholdCount: 10
-      VpcId:
-        Fn::ImportValue: !Sub ${EnvironmentName}:VpcId
+      VpcId: VpcId: !Ref 'CustomVPC'
       TargetGroupAttributes:
       - Key: deregistration_delay.timeout_seconds
         Value: '5'
       - Key: slow_start.duration_seconds
         Value: '60'
-  PublicLoadBalancerListener:
+  PrivateoadBalancerListener:
     Type: AWS::ElasticLoadBalancingV2::Listener
     DependsOn:
-      - PublicLoadBalancer
+      - PrivateoadBalancer
     Properties:
       DefaultActions:
         - TargetGroupArn: !Ref 'DummyTargetGroupPublic'
           Type: 'forward'
-      LoadBalancerArn: !Ref 'PublicLoadBalancer'
+      LoadBalancerArn: !Ref 'PrivateoadBalancer'
       Port: 80
       Protocol: HTTP
 
 Outputs:
   PublicListener:
     Description: The ARN of the public load balancer's Listener
-    Value: !Ref PublicLoadBalancerListener
+    Value: !Ref PrivateoadBalancerListener
     Export:
       Name: !Sub ${EnvironmentName}:PublicListener
   ExternalUrl:
     Description: The url of the external load balancer
-    Value: !Sub http://${PublicLoadBalancer.DNSName}
+    Value: !Sub http://${PrivateoadBalancer.DNSName}
     Export:
       Name: !Sub ${EnvironmentName}:ExternalUrl
