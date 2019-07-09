@@ -7,35 +7,42 @@ Parameters:
     AllowedValues:
       - 'CustomVPC'
     Description: VPC where the EC2 DataStage will be created
-  InstanceSubnet:
-    Type: 'AWS::SSM::Parameter::Value<String>'
-    Default: /network/Apps_2a
-    Description: Subnet and Availability Zone to deploy to
-    AllowedValues:
-      - /network/Apps_2a
-      - /network/Apps_2b
-      - /network/Apps_2c
-      - /network/Data_2a
-      - /network/Data_2b
-      - /network/Data_2c
-      
+    
+  # InstanceSubnet:
+    # Type: 'AWS::SSM::Parameter::Value<String>'
+    # Default: /network/Apps_2a
+    # Description: Subnet and Availability Zone to deploy to
+    # AllowedValues:
+      # - /network/Apps_2a
+      # - /network/Apps_2b
+      # - /network/Apps_2c
+      # - /network/Data_2a
+      # - /network/Data_2b
+      # - /network/Data_2c
+ 
   agency:
     Type: String
     Default: ST
+    Description: The name of the environment to add this load balancer to
+  EnvironmentName:
+
+    Type: String
+
+    Default: fargatedemo
+
     Description: The name of the environment to add this load balancer to
 Resources:
   ContainerSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: Access to the Fargate containers
-      VpcId: !Ref 'CustomVPC'
+      VpcId: !Ref 'VPC'
       
   EcsSecurityGroupIngressFromPublicALB:
     Type: AWS::EC2::SecurityGroupIngress
     Properties:
       Description: Ingress from the public ALB
-      GroupId:
-        Fn::ImportValue: !Ref 'ContainerSecurityGroup'
+      GroupId: !Ref 'ContainerSecurityGroup'
       IpProtocol: -1
       SourceSecurityGroupId: !Ref 'PrivateLoadBalancerSG'
 
@@ -47,7 +54,7 @@ Resources:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: Access to the public facing load balancer
-      VpcId: !Ref 'CustomVPC'        
+      VpcId: !Ref 'VPC'        
       SecurityGroupIngress:
           # Allow access to ALB from anywhere on the internet
           - CidrIp: 10.0.0.0/0
@@ -82,7 +89,7 @@ Resources:
       Port: 80
       Protocol: HTTP
       UnhealthyThresholdCount: 10
-      VpcId: !Ref 'CustomVPC'
+      VpcId: !Ref 'VPC'
       TargetGroupAttributes:
       - Key: deregistration_delay.timeout_seconds
         Value: '5'
